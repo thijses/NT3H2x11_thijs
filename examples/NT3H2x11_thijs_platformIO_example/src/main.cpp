@@ -1,11 +1,11 @@
 /*
 
-for the TODO list of remaining features/functions, see NT3H1x01_thijs.h (bottom of comment at the top)
+for the TODO list of remaining features/functions, see NT3H2x11_thijs.h (bottom of comment at the top)
 
-This is a test of the NFC IC: NT3H1201
+This is a test of the NFC IC: NT3H2111 and NT3H2211
 This sketch should serve to show some of the functions,
- HOWEVER, to truly understand this thing, please just read the preface of NT3H1x01_thijs.h (comment at the top).
-In there, i've summarized the datasheet, because the actual datasheet is a scatter-brained mess: https://www.mouser.com/datasheet/2/302/NT3H1101_1201-1127167.pdf
+ HOWEVER, to truly understand this thing, please just read the preface of NT3H2x11_thijs.h (comment at the top).
+In there, i've summarized the datasheet, because the actual datasheet is a scatter-brained mess: https://www.farnell.com/datasheets/2148700.pdf
 Every function has a C++ documentation comment above it, so if your IDE is sufficiently modern, finding the right function shouldn't be that hard
 
 */
