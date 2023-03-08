@@ -183,7 +183,7 @@ void setup()
   Serial.print("getACCESS_AUTHLIM: "); Serial.println(NFCtag.getACCESS_AUTHLIM());
   Serial.print("getPT_I2C: 0b"); Serial.println(NFCtag.getPT_I2C(), BIN);
   Serial.print("getPT_I2C_2K_PROT: "); Serial.println(NFCtag.getPT_I2C_2K_PROT());
-  Serial.print("setPT_I2C_SRAM_PROT: "); Serial.println(NFCtag.setPT_I2C_SRAM_PROT());
+  Serial.print("getPT_I2C_SRAM_PROT: "); Serial.println(NFCtag.getPT_I2C_SRAM_PROT());
   Serial.print("getPT_I2C_I2C_PROT: "); Serial.println(NFCtag.getPT_I2C_I2C_PROT());
   Serial.println();
 
