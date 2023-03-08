@@ -2,6 +2,9 @@
 
 link to datasheet (77 page version): https://www.farnell.com/datasheets/2148700.pdf
 
+IMPORTANT NOTE: this is an adaptation of my NT3H1x01 library.
+                some of the things i wrote below may only apply to he NT3H1x01, and the password feature documentation for the NT3H2x11 is still TODO
+
 
 The IC has 2 means of communicating, RF/NFC and I2C.
 both the RF interface (the actual NFC functionality) and the I2C interface are all about memory access.
@@ -173,9 +176,6 @@ TO check out:
 - FD pin start of comm vs tag selection
 - soft reset function
 
-changes to sync with NT3H1x01:
-- use NT3H2x11_CONF_SESS_REGS_ENUM instead of uint8_t for byteInBlock in _setConfRegBits()
-
 MUST WRITE for 2x11:
 - password documentation above  //// NOTE: I2C_PROT does not apply to: Session registers, SRAM and 'configuration pages' including PWD config, but dependent on REG_LOCK_I2C
 - update/remove memory locations in documentation above
@@ -198,7 +198,6 @@ TODO (general):
 - generalized memory map struct (also for other libraries). Could just be an enum, i just don't love #define
 
 TO write (specific functions):
-- struct for the password block (0x39), to write all of it (ACCESS,PWD,PACK,PT_I2C) at once, in a legible (and LSByte-correct) fashion
 - printConfig() (print contents of Session registers, LAST_NDEF_BLOCK, etc. in a LEGIBLE fashion)
 - (arbetrary file writing funtion (mostly setting LAST_NDEF_BLOCK to indicate the size))
 - block writing/reading to/from file/flash/EEPROM/idk   (2kB of data coming from somewhere, going to somewhere!)
@@ -287,7 +286,7 @@ enum NT3H2x11_CONF_SESS_REGS_ENUM : uint8_t { // you could also do this with jus
   NT3H2x11_COMN_REGS_SRAM_MIRROR_BLOCK_BYTE = 2,  // SRAM_MIRROR_BLOCK register location in the conf/sess. registers
   NT3H2x11_COMN_REGS_WDT_LS_BYTE = 3,  // WDT_LS register location in the conf/sess. registers
   NT3H2x11_COMN_REGS_WDT_MS_BYTE = 4,  // WDT_MS register location in the conf/sess. registers
-  NT3H2x11_COMN_REGS_I2C_CLOCK_STR_BYTE = 5,  // I2C_CLOCK_STR register location in the conf/sess. registers
+  NT3H2x11_COMN_REGS_I2C_CLOCK_STR_BYTE = 5,  // I2C_CLOCK_STR register location in the conf/sess. registers     NOTE: Read only in Sess.
 //// configuration registers only:
   NT3H2x11_CONF_REGS_REG_LOCK_BYTE = 6,  // REG_LOCK register location in the conf/sess. registers
 //// session registers only:
@@ -316,7 +315,7 @@ enum NT3H2x11_FD_OFF_ENUM : uint8_t { // 2bit value to determine what triggers t
 };
 
 //// NC_REG common:
-#define NT3H2x11_NC_REG_SIL_SRST_bits 0b10000000 // NFCS_I2C_RST_ON_OFF enables NFC-silence AND soft-reset-through-repeated-I2C-starts (very cool, slighly niche)
+#define NT3H2x11_NC_REG_SIL_SRST_bits 0b10000000 // NFCS_I2C_RST_ON_OFF enables (NFC-silence (NT3H2x11 only) AND) soft-reset-through-repeated-I2C-starts (very cool, slightly niche)
 #define NT3H2x11_NC_REG_PTHRU_bits    0b01000000 // PTHRU_ON_OFF enables Pass-Through mode
 #define NT3H2x11_NC_REG_FD_OFF_bits   0b00110000 // FD_OFF determines the behaviour of the FD pin (falling)
 #define NT3H2x11_NC_REG_FD_ON_bits    0b00001100 // FD_ON determines the behaviour of the FD pin (rising)
@@ -353,7 +352,7 @@ enum NT3H2x11_FD_OFF_ENUM : uint8_t { // 2bit value to determine what triggers t
 //// you could also store whole blocks in a dedicated struct, and only send them once they're fully ready
 // template<uint8_t arraySize> // template not needed, as all blocks are the same size; NT3H2x11_BLOCK_SIZE
 struct _blockStruct { // a nice, consistant packet structure
-  uint8_t _data[NT3H2x11_BLOCK_SIZE]; // byte array is 1 byte larger in order to store the checksum byte!
+  uint8_t _data[NT3H2x11_BLOCK_SIZE];
   _blockStruct() { for(uint8_t i=0; i<NT3H2x11_BLOCK_SIZE; i++) { _data[i] = 0; } } // initalize to 0s
   // _blockStruct(uint8_t* _dataInput) {for(uint8_t i=0;i<sizeof(_data);i++){_data[i]=_dataInput[i];}}
   // _blockStruct(uint8_t* _dataInput) { _data = _dataInput; }
@@ -558,6 +557,13 @@ class NT3H2x11_thijs : public _NT3H2x11_thijs_base
       err = requestMemBlock(blockAddress, _oneBlockBuff); _oneBlockBuffAddress = blockAddress; // fetch the whole block
       if(!_errGood(err)) { NT3H2x11debugPrint("_setBitsInBlock() read/write error!"); _oneBlockBuffAddress = NT3H2x11_INVALID_MEMA; return(err); }
     }
+    if((blockAddress == NT3H2x11_I2C_ADDR_CHANGE_MEMA) && (byteInBlock != NT3H2x11_I2C_ADDR_CHANGE_MEMA_BYTE)) { _oneBlockBuff[NT3H2x11_I2C_ADDR_CHANGE_MEMA_BYTE] = (slaveAddress<<1); } // I2C address byte reads as manufacturer ID
+    if(blockAddress == NT3H2x11_PWD_MEMA) { // (same as NT3H2x11_PACK_MEMA) the password and PACK read as all 0's (for obvious reasons)
+      //// there is no (reasonable) way to set PWD and PACk at the same time (replacing all unreadable bytes) using multi-byte values. So, the _passwordAndPackBuff is always used
+      if(!_passwordAndPackStored) { NT3H2x11debugPrint("_setBytesInBlock() overwrote password/PACK with all 0's! use storePWD_and_PACK() or setPWD_and_PACK() first!"); } // only warn, don't actually prevent writing
+      for(uint8_t i=0; i<6; i++) { _oneBlockBuff[i+NT3H2x11_PWD_MEMA_BYTES_START] = _passwordAndPackBuff[i]; } // NOTE: 6 is made possible by the fact that PWD and PACK are contiguous!
+      //if((AUTH0 <= NT3H2x11_AUTH0_DISABLE_THRESH) || (PT_I2C != 0)) { /* warn about the fact that password writing is going to fail (because it's actively used) */ }
+    }
     _oneBlockBuff[byteInBlock] &= ~mask;            // excise old data
     _oneBlockBuff[byteInBlock] |= (newVal & mask);  // insert new data
     err = writeMemBlock(blockAddress, _oneBlockBuff);
@@ -623,7 +629,7 @@ class NT3H2x11_thijs : public _NT3H2x11_thijs_base
   NT3H2x11_ERR_RETURN_TYPE _setSess_NC_oneBit(uint8_t mask, bool newBitVal) { return(writeSessRegByte(NT3H2x11_COMN_REGS_NC_REG_BYTE, newBitVal ? mask : 0, mask)); }
   /**
    * overwrite NFCS_I2C_RST_ON_OFF bit from the NC_REG Session register
-   * @param newVal NFCS_I2C_RST_ON_OFF enables NFC-silence AND soft-reset-through-repeated-I2C-starts (very cool, slighly niche)
+   * @param newVal NFCS_I2C_RST_ON_OFF enables NFC-silence AND soft-reset-through-repeated-I2C-starts (very cool, slightly niche)
    * @return (bool or esp_err_t or i2c_status_e, see on defines at top) whether it wrote successfully
    */
   NT3H2x11_ERR_RETURN_TYPE setSess_NC_NFCS_I2C_RST(bool newVal) { return(_setSess_NC_oneBit(NT3H2x11_NC_REG_SIL_SRST_bits, newVal)); } // (just a macro)
@@ -768,7 +774,7 @@ class NT3H2x11_thijs : public _NT3H2x11_thijs_base
     return(_setConfRegBits(NT3H2x11_COMN_REGS_NC_REG_BYTE, newBitVal ? mask : 0, mask, useCache)); }
   /**
    * overwrite NFCS_I2C_RST_ON_OFF bit from the NC_REG Configuration register
-   * @param newVal NFCS_I2C_RST_ON_OFF enables NFC-silence AND soft-reset-through-repeated-I2C-starts (very cool, slighly niche)
+   * @param newVal NFCS_I2C_RST_ON_OFF enables NFC-silence AND soft-reset-through-repeated-I2C-starts (very cool, slightly niche)
    * @param useCache (optional!, not recommended, use at own discretion) use data from _oneBlockBuff cache (if possible) instead of actually reading it from I2C (to save a little time).
    * @return (bool or esp_err_t or i2c_status_e, see on defines at top) whether it wrote successfully
    */
@@ -1082,7 +1088,7 @@ class NT3H2x11_thijs : public _NT3H2x11_thijs_base
   }
   /**
    * retrieve NFCS_I2C_RST_ON_OFF bit from the NC_REG Session register
-   * @return the NFCS_I2C_RST_ON_OFF bit (bool)     NFCS_I2C_RST_ON_OFF enables NFC-silence AND soft-reset-through-repeated-I2C-starts (very cool, slighly niche)
+   * @return the NFCS_I2C_RST_ON_OFF bit (bool)     NFCS_I2C_RST_ON_OFF enables NFC-silence AND soft-reset-through-repeated-I2C-starts (very cool, slightly niche)
    */
   bool getSess_NC_NFCS_I2C_RST() { return((getSess_NC_REG() & NT3H2x11_NC_REG_SIL_SRST_bits) != 0); } // (just a macro)
   /**
@@ -1285,7 +1291,7 @@ class NT3H2x11_thijs : public _NT3H2x11_thijs_base
   /**
    * retrieve NFCS_I2C_RST_ON_OFF bit from the NC_REG Configuration register
    * @param useCache (optional!, not recommended, use at own discretion) fetch data from _oneBlockBuff cache (if possible) instead of actually reading it from I2C (to save a little time).
-   * @return the NFCS_I2C_RST_ON_OFF bit (bool)     NFCS_I2C_RST_ON_OFF enables NFC-silence AND soft-reset-through-repeated-I2C-starts (very cool, slighly niche)
+   * @return the NFCS_I2C_RST_ON_OFF bit (bool)     NFCS_I2C_RST_ON_OFF enables NFC-silence AND soft-reset-through-repeated-I2C-starts (very cool, slightly niche)
    */
   bool getConf_NC_NFCS_I2C_RST(bool useCache=false) { return((getConf_NC_REG(useCache) & NT3H2x11_NC_REG_SIL_SRST_bits) != 0); } // (just a macro)
   /**

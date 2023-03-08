@@ -142,6 +142,7 @@ void setup()
   // Serial.print("getSess_WDTraw: 0x"); Serial.println(NFCtag.getSess_WDTraw(), HEX);
   Serial.print("getSess_WDT: "); Serial.print(NFCtag.getSess_WDT()); Serial.println("us  default is ~20ms");
   Serial.print("getSess_I2C_CLOCK_STR: "); Serial.print(NFCtag.getSess_I2C_CLOCK_STR()); Serial.print("  default: "); Serial.println(NT3H2x11_SESS_REGS_DEFAULT[5]); // (NOTE: 1x01 to 2x11 change)
+  Serial.print("getSess_NEG_AUTH_REACHED: "); Serial.println(NFCtag.getSess_NEG_AUTH_REACHED()); 
   Serial.println(); // seperator
   Serial.print("getNS_REG: 0b"); Serial.print(NFCtag.getNS_REG(), BIN); Serial.print("  default: 0b"); Serial.println(NT3H2x11_SESS_REGS_DEFAULT[6], BIN);
   Serial.print("getNS_NDEF_DATA_READ: "); Serial.println(NFCtag.getNS_NDEF_DATA_READ());
