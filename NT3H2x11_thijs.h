@@ -543,6 +543,27 @@ class NT3H2x11_thijs : public _NT3H2x11_thijs_base
     if(!_errGood(err)) { NT3H2x11debugPrint("_setValInBlock() write error!"); }
     return(err);
   }
+  /**
+   * (private) overwrite a portion (mask) of an arbetrary byte in an arbetrary block (same as _setValInBlock<uint8_t> BUT with a bitmask option)
+   * @param blockAddress MEMory Address (MEMA) of the block
+   * @param byteInBlock where in the block the relevant data starts (see defines up top)
+   * @param newVal value (partial byte) to write into the block
+   * @param mask which bits to affect (manual code, NOT inherent part of I2C format like with session registers)
+   * @param useCache (optional!, not recommended, use at own discretion) use data from _oneBlockBuff cache (if possible) instead of actually reading it from I2C (to save a little time).
+   * @return (bool or esp_err_t or i2c_status_e, see on defines at top) whether it wrote/read successfully
+   */
+  NT3H2x11_ERR_RETURN_TYPE _setBitsInBlock(uint8_t blockAddress, uint8_t byteInBlock, uint8_t newVal, uint8_t mask, bool useCache=false) {
+    NT3H2x11_ERR_RETURN_TYPE err = NT3H2x11_ERR_RETURN_TYPE_OK;
+    if( ! (useCache && (blockAddress == _oneBlockBuffAddress))) { // normally true
+      err = requestMemBlock(blockAddress, _oneBlockBuff); _oneBlockBuffAddress = blockAddress; // fetch the whole block
+      if(!_errGood(err)) { NT3H2x11debugPrint("_setBitsInBlock() read/write error!"); _oneBlockBuffAddress = NT3H2x11_INVALID_MEMA; return(err); }
+    }
+    _oneBlockBuff[byteInBlock] &= ~mask;            // excise old data
+    _oneBlockBuff[byteInBlock] |= (newVal & mask);  // insert new data
+    err = writeMemBlock(blockAddress, _oneBlockBuff);
+    if(!_errGood(err)) { NT3H2x11debugPrint("_setBitsInBlock() write error!"); }
+    return(err);
+  }
 
 /////////////////////////////////////////////////////////////////////////////////////// set functions: //////////////////////////////////////////////////////////
 
@@ -701,27 +722,6 @@ class NT3H2x11_thijs : public _NT3H2x11_thijs_base
   template<typename T> 
   NT3H2x11_ERR_RETURN_TYPE _setConfRegVal(NT3H2x11_CONF_SESS_REGS_ENUM bytesInBlockStart, T newVal, bool writeMSBfirst=false, bool useCache=false)
     { return(_setValInBlock<T>(NT3H2x11_CONF_REGS_MEMA, bytesInBlockStart, newVal, writeMSBfirst, useCache)); } // (just a macro)
-  /**
-   * (private) overwrite a portion (mask) of an arbetrary byte in an arbetrary block (same as _setValInBlock<uint8_t> BUT with a bitmask option)
-   * @param blockAddress MEMory Address (MEMA) of the block
-   * @param byteInBlock where in the block the relevant data starts (see defines up top)
-   * @param newVal value (partial byte) to write into the block
-   * @param mask which bits to affect (manual code, NOT inherent part of I2C format like with session registers)
-   * @param useCache (optional!, not recommended, use at own discretion) use data from _oneBlockBuff cache (if possible) instead of actually reading it from I2C (to save a little time).
-   * @return (bool or esp_err_t or i2c_status_e, see on defines at top) whether it wrote/read successfully
-   */
-  NT3H2x11_ERR_RETURN_TYPE _setBitsInBlock(uint8_t blockAddress, uint8_t byteInBlock, uint8_t newVal, uint8_t mask, bool useCache=false) {
-    NT3H2x11_ERR_RETURN_TYPE err = NT3H2x11_ERR_RETURN_TYPE_OK;
-    if( ! (useCache && (blockAddress == _oneBlockBuffAddress))) { // normally true
-      err = requestMemBlock(blockAddress, _oneBlockBuff); _oneBlockBuffAddress = blockAddress; // fetch the whole block
-      if(!_errGood(err)) { NT3H2x11debugPrint("_setBitsInBlock() read/write error!"); _oneBlockBuffAddress = NT3H2x11_INVALID_MEMA; return(err); }
-    }
-    _oneBlockBuff[byteInBlock] &= ~mask;            // excise old data
-    _oneBlockBuff[byteInBlock] |= (newVal & mask);  // insert new data
-    err = writeMemBlock(blockAddress, _oneBlockBuff);
-    if(!_errGood(err)) { NT3H2x11debugPrint("_setBitsInBlock() write error!"); }
-    return(err);
-  }
   /**
    * (private) overwrite a portion (mask) of an arbetrary byte in the Configuration registers (same as _setConfRegVal<uint8_t> BUT with a bitmask option)
    * @param byteInBlock where in the block the relevant data starts (see defines up top)
@@ -1469,7 +1469,7 @@ class NT3H2x11_thijs : public _NT3H2x11_thijs_base
    * @param useCache (optional!, not recommended, use at own discretion) fetch data from _oneBlockBuff cache (if possible) instead of actually reading it from I2C (to save a little time).
    * @return the  bit (bool)     
    */
-  bool setPT_I2C_SRAM_PROT(bool useCache=false) { return((getPT_I2C(useCache) & NT3H2x11_PT_I2C_SRAM_PROT_bits) != 0); } // (just a macro)
+  bool getPT_I2C_SRAM_PROT(bool useCache=false) { return((getPT_I2C(useCache) & NT3H2x11_PT_I2C_SRAM_PROT_bits) != 0); } // (just a macro)
   /**
    * retrieve  bits from the PT_I2C byte (for password stuff)
    * @param useCache (optional!, not recommended, use at own discretion) fetch data from _oneBlockBuff cache (if possible) instead of actually reading it from I2C (to save a little time).
