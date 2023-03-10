@@ -1,4 +1,4 @@
-please put the NT3H1x01 library in a folder named 'lib' inside the platformIO example:
+please put the NT3H2x11 library in a folder named 'lib' inside the platformIO example:
 
 here is the contents of the README file that comes with the lib folder
 
